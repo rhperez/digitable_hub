@@ -113,7 +113,7 @@ function requestRepos($login) {
 */
 function requestBranches($login, $repo_name, $last_update = null) {
   $url = "https://api.github.com/repos/".$login."/".$repo_name."/branches";
-  echo "Solicitando ramas, repo ".$repo_name."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;Solicitando ramas, repo ".$repo_name."...<br/>";
   $response = executeRequest($url);
   $json_branches = json_decode($response);
   if ($json_branches->message) {
@@ -121,19 +121,19 @@ function requestBranches($login, $repo_name, $last_update = null) {
     die();
   }
   $repo_id = getRepo_id($login, $repo_name);
-  echo "Agregando ramas, repo ".$repo_name."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;Agregando ramas, repo ".$repo_name."...<br/>";
   foreach ($json_branches as $branch) {
     $rows_affected = insertBranch($branch, $repo_id);
     switch ($rows_affected) {
       case 1:
-      echo "Nueva rama: ".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nueva rama: ".$branch->commit->sha."<br/>";
       break;
       case 0:
       case 2:
-      echo "Rama actualizada: ".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama actualizada: ".$branch->commit->sha."<br/>";
       break;
       default:
-      echo "Error en el query, rama".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, rama".$branch->commit->sha."<br/>";
       break;
     }
     requestCommits($login, $repo_name, $branch->commit->sha, $last_update);
@@ -149,7 +149,7 @@ function requestBranches($login, $repo_name, $last_update = null) {
 */
 function requestCollaborators($login, $repo_name) {
   $url = "https://api.github.com/repos/".$login."/".$repo_name."/collaborators";
-  echo "Solicitando colaboradores, repo ".$repo_name."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;Solicitando colaboradores, repo ".$repo_name."...<br/>";
   $response = executeRequest($url);
   $json_collaborators = json_decode($response);
   if ($json_collaborators->message) {
@@ -157,21 +157,21 @@ function requestCollaborators($login, $repo_name) {
     die();
   }
   $repo_id = getRepo_id($login, $repo_name);
-  echo "Agregando colaboradores, repo ".$repo_name."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;Agregando colaboradores, repo ".$repo_name."...<br/>";
   foreach ($json_collaborators as $collaborator) {
     $rows_affected = insertCollaborator($collaborator, $repo_id);
     switch ($rows_affected) {
       case 0:
-      echo "Colaborador sin cambios: ".$collaborator->id."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Colaborador sin cambios: ".$collaborator->id."<br/>";
       break;
       case 1:
-      echo "Nuevo colaborador: ".$collaborator->id."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nuevo colaborador: ".$collaborator->id."<br/>";
       break;
       case 2:
-      echo "Colaborador actualizado: ".$collaborator->id."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Colaborador actualizado: ".$collaborator->id."<br/>";
       break;
       default:
-      echo "Error en el query, colaborador".$collaborator->id."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, colaborador".$collaborator->id."<br/>";
       break;
     }
   }
@@ -194,28 +194,28 @@ function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
     $since = '';
   }
   $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits?sha=".$branch_sha.$since;
-  echo "Solicitando commits, rama ".$branch_sha."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Solicitando commits, rama ".$branch_sha."...<br/>";
   $response = executeRequest($url);
   $json_commits = json_decode($response);
   if ($json_commits->message) {
     echo "Error: ".$json_commits->message;
     die();
   }
-  echo "Agregando commits, rama ".$branch_sha."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Agregando commits, rama ".$branch_sha."...<br/>";
   foreach ($json_commits as $commit) {
     $rows_affected = insertCommit($commit, $branch_sha);
     switch ($rows_affected) {
       case 0:
-      echo "Commit sin cambios: ".$commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Commit sin cambios: ".$commit->sha."<br/>";
       break;
       case 1:
-      echo "Nuevo commit: ".$commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nuevo commit: ".$commit->sha."<br/>";
       break;
       case 2:
-      echo "Commit actualizado: ".$commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Commit actualizado: ".$commit->sha."<br/>";
       break;
       default:
-      echo "Error en el query, commit".$commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, commit".$commit->sha."<br/>";
       break;
     }
   }
