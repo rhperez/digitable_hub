@@ -195,6 +195,7 @@ function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
   }
   $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits?sha=".$branch_sha.$since;
   echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Solicitando commits, rama ".$branch_sha."...<br/>";
+  echo $url."<br/>";
   $response = executeRequest($url);
   $json_commits = json_decode($response);
   if ($json_commits->message) {
