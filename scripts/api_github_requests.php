@@ -125,10 +125,12 @@ function requestBranches($login, $repo_name, $last_update = null) {
   foreach ($json_branches as $branch) {
     $rows_affected = insertBranch($branch, $repo_id);
     switch ($rows_affected) {
+      case 0:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama sin cambios: ".$branch->commit->sha."<br/>";
+      break;
       case 1:
       echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nueva rama: ".$branch->commit->sha."<br/>";
       break;
-      case 0:
       case 2:
       echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama actualizada: ".$branch->commit->sha."<br/>";
       break;
@@ -136,7 +138,9 @@ function requestBranches($login, $repo_name, $last_update = null) {
       echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, rama".$branch->commit->sha."<br/>";
       break;
     }
-    requestCommits($login, $repo_name, $branch->commit->sha, $last_update);
+    if ($rows_affected > 0) {
+      requestCommits($login, $repo_name, $branch->commit->sha, $last_update);
+    }
   }
   return $json_branches;
 }
@@ -189,7 +193,7 @@ function requestCollaborators($login, $repo_name) {
 function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
   //if ($updated_at = getRepoLastUpdate($user, $repo_name)) {
   if ($last_update) {
-    $since = "&since=".str_replace(' ', 'T', $last_update);
+    $since = "&since=".str_replace(' ', 'T', $last_update)."Z";
   } else {
     $since = '';
   }
