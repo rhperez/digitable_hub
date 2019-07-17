@@ -188,7 +188,7 @@ function requestCollaborators($login, $repo_name) {
 */
 function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
   //if ($updated_at = getRepoLastUpdate($user, $repo_name)) {
-  if ($since) {
+  if ($last_update) {
     $since = "&since=".str_replace(' ', 'T', $last_update);
   } else {
     $since = '';
