@@ -42,11 +42,11 @@ function requestMe() {
 
 /**
 * Solicita a la API la información de un usuario en formato JSON y la almacena en la base de datos
-* @param user_name el username del usuario
+* @param login el login del usuario
 * @return json_user La información del usuario en formato JSON
 */
-function requestUser($user_name) {
-  $url = "https://api.github.com/users/".$user_name;
+function requestUser($login) {
+  $url = "https://api.github.com/users/".$login;
   $response = executeRequest($url);
   $json_user = json_decode($response);
   if ($json_user->message) {
@@ -59,11 +59,12 @@ function requestUser($user_name) {
 
 /**
 * Solicita a la API la información de los repositorios de un usuario en formato JSON y la almacena en la base de datos
-* @param user el id del usuario propietario de los repositorios
+* @param login el login del usuario propietario de los repositorios
 * @return json_repos La información de los repositorios, en formato JSON
 */
-function requestRepos($user) {
-  $url = "https://api.github.com/users/".$user."/repos";
+function requestRepos($login) {
+  $url = "https://api.github.com/users/".$login."/repos";
+  echo "Solicitando repositorios, usuario ".$login."...<br/>";
   $response = executeRequest($url);
   $json_repos = json_decode($response);
   $repos_unchanged = 0;
@@ -73,91 +74,150 @@ function requestRepos($user) {
     echo "Error: ".$json_repos->message;
     die();
   }
+  echo "Agregando repositorios, usuario ".$login."...<br/>";
   foreach($json_repos as $repo) {
     $rows_affected = insertRepo($repo);
-    if (!$rows_affected) { // no changes
+    if (!$rows_affected) { // repositorio sin cambios
       $repos_unchanged++;
+      echo "Repositorio ".$repo->name." sin cambios<br/>";
       continue;
     }
-    requestBranches($user, $repo->name);
-    if ($rows_affected == 1) { // repo inserted
+    $last_update = getRepoLastUpdate($login, $repo->name);
+    requestBranches($login, $repo->name, $last_update);
+    requestCollaborators($login, $repo->name);
+    if ($rows_affected == 1) { // repositorio insertado
       $repos_inserted++;
-    } else { // repo updated
+      echo "Agregado nuevo repositorio: ".$repo->name."<br/>";
+
+    } else { // repositorio actualizado
       $repos_updated++;
+      echo "Actualizado repositorio: ".$repo->name."<br/>";
+
     }
   }
-  echo "Repos Inserted: ".$repos_inserted."<br/>";
-  echo "Repos Updated: ".$repos_updated."<br/>";
-  echo "Repos Unchanged: ".$repos_unchanged."<br/>";
+  echo "Repos agregados: ".$repos_inserted."<br/>";
+  echo "Repos actualizados: ".$repos_updated."<br/>";
+  echo "Repos sin cambios: ".$repos_unchanged."<br/>";
+  $user_id = getUser_id($login);
+  $repos_up_to_date = updateRepos($user_id);
+  echo "Total de repos puestos al día: ".$repos_up_to_date."<br/>";
   return $json_repos;
 }
 
 /**
 * Solicita a la API la información de las ramas de un repositorio en formato JSON y la almacena en la base de datos
-* @param user el id del usuario propietario del repositorio
+* @param login el login del usuario propietario del repositorio
 * @param repo_name el nombre del repositorio
+* @param last_update Opcional, la fecha de última actualización del repositorio
 * @return json_branches La información de las ramas del repositorio, en formato JSON
 */
-function requestBranches($user, $repo_name) {
-  $url = "https://api.github.com/repos/".$user."/".$repo_name."/branches";
+function requestBranches($login, $repo_name, $last_update = null) {
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/branches";
+  echo "Solicitando ramas, repo ".$repo_name."...<br/>";
   $response = executeRequest($url);
   $json_branches = json_decode($response);
   if ($json_branches->message) {
     echo "Error: ".$json_branches->message;
     die();
   }
-  $repo_id = getRepo_id($user, $repo_name);
+  $repo_id = getRepo_id($login, $repo_name);
+  echo "Agregando ramas, repo ".$repo_name."...<br/>";
   foreach ($json_branches as $branch) {
-    insertBranch($branch, $repo_id);
+    $rows_affected = insertBranch($branch, $repo_id);
+    switch ($rows_affected) {
+      case 1:
+      echo "Nueva rama: ".$branch->commit->sha."<br/>";
+      break;
+      case 0:
+      case 2:
+      echo "Rama actualizada: ".$branch->commit->sha."<br/>";
+      break;
+      default:
+      echo "Error en el query, rama".$branch->commit->sha."<br/>";
+      break;
+    }
+    requestCommits($login, $repo_name, $branch->commit->sha, $last_update);
   }
   return $json_branches;
 }
 
 /**
 * Solicita a la API la información de los colaboradores de un repositorio en formato JSON y la almacena en la base de datos
-* @param user el id del usuario propietario del repositorio
+* @param login el login del usuario propietario del repositorio
 * @param repo_name el nombre del repositorio
 * @return json_collaborators La información de los colaboradores del repositorio, en formato JSON
 */
-function requestCollaborators($user, $repo_name) {
-  $url = "https://api.github.com/repos/".$user."/".$repo_name."/collaborators";
+function requestCollaborators($login, $repo_name) {
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/collaborators";
+  echo "Solicitando colaboradores, repo ".$repo_name."...<br/>";
   $response = executeRequest($url);
   $json_collaborators = json_decode($response);
   if ($json_collaborators->message) {
     echo "Error: ".$json_collaborators->message;
     die();
   }
-  $repo_id = getRepo_id($user, $repo_name);
+  $repo_id = getRepo_id($login, $repo_name);
+  echo "Agregando colaboradores, repo ".$repo_name."...<br/>";
   foreach ($json_collaborators as $collaborator) {
-    insertCollaborator($collaborator, $repo_id);
+    $rows_affected = insertCollaborator($collaborator, $repo_id);
+    switch ($rows_affected) {
+      case 0:
+      echo "Colaborador sin cambios: ".$collaborator->id."<br/>";
+      break;
+      case 1:
+      echo "Nuevo colaborador: ".$collaborator->id."<br/>";
+      break;
+      case 2:
+      echo "Colaborador actualizado: ".$collaborator->id."<br/>";
+      break;
+      default:
+      echo "Error en el query, colaborador".$collaborator->id."<br/>";
+      break;
+    }
   }
   return $json_collaborators;
 }
 
 /**
 * Solicita a la API la información de los commits de una rama en formato JSON y la almacena en la base de datos
-* @param user el id del usuario propietario del repositorio
+* @param login el login del usuario propietario del repositorio
 * @param repo_name el nombre del repositorio al que pertenece la rama
 * @param branch_sha el identificador SHA de la rama
 * @param last_update Opcional, la fecha de última actualización del repositorio
 * @return json_commits La información de los commits de la rama, en formato JSON
 */
-function requestCommits($user, $repo_name, $branch_sha, $last_update = null) {
+function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
   //if ($updated_at = getRepoLastUpdate($user, $repo_name)) {
   if ($since) {
     $since = "&since=".str_replace(' ', 'T', $last_update);
   } else {
     $since = '';
   }
-  $url = "https://api.github.com/repos/".$user."/".$repo_name."/commits?sha=".$branch_sha.$since;
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits?sha=".$branch_sha.$since;
+  echo "Solicitando commits, rama ".$branch_sha."...<br/>";
   $response = executeRequest($url);
   $json_commits = json_decode($response);
   if ($json_commits->message) {
     echo "Error: ".$json_commits->message;
     die();
   }
+  echo "Agregando commits, rama ".$branch_sha."...<br/>";
   foreach ($json_commits as $commit) {
-    insertCommit($commit, $branch_sha);
+    $rows_affected = insertCommit($commit, $branch_sha);
+    switch ($rows_affected) {
+      case 0:
+      echo "Commit sin cambios: ".$commit->sha."<br/>";
+      break;
+      case 1:
+      echo "Nuevo commit: ".$commit->sha."<br/>";
+      break;
+      case 2:
+      echo "Commit actualizado: ".$commit->sha."<br/>";
+      break;
+      default:
+      echo "Error en el query, commit".$commit->sha."<br/>";
+      break;
+    }
   }
   return $json_commits;
 }
