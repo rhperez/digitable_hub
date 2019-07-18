@@ -126,20 +126,20 @@ function requestBranches($login, $repo_name, $last_update = null) {
     $rows_affected = insertBranch($branch, $repo_id);
     switch ($rows_affected) {
       case 0:
-      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama sin cambios: ".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama sin cambios: ".$branch->name."<br/>";
       break;
       case 1:
-      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nueva rama: ".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nueva rama: ".$branch->name."<br/>";
       break;
       case 2:
-      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama actualizada: ".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rama actualizada: ".$branch->name."<br/>";
       break;
       default:
-      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, rama".$branch->commit->sha."<br/>";
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, rama".$branch->name."<br/>";
       break;
     }
     if ($rows_affected > 0) {
-      requestCommits($login, $repo_name, $branch->commit->sha, $last_update);
+      requestCommits($login, $repo_name, $branch->name, $last_update);
     }
   }
   return $json_branches;
@@ -186,19 +186,18 @@ function requestCollaborators($login, $repo_name) {
 * Solicita a la API la información de los commits de una rama en formato JSON y la almacena en la base de datos
 * @param login el login del usuario propietario del repositorio
 * @param repo_name el nombre del repositorio al que pertenece la rama
-* @param branch_sha el identificador SHA de la rama
+* @param branch_name el nombre de la rama
 * @param last_update Opcional, la fecha de última actualización del repositorio
 * @return json_commits La información de los commits de la rama, en formato JSON
 */
-function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
-  //if ($updated_at = getRepoLastUpdate($user, $repo_name)) {
+function requestCommits($login, $repo_name, $branch_name, $last_update = null) {
   if ($last_update) {
     $since = "&since=".str_replace(' ', 'T', $last_update)."Z";
   } else {
     $since = '';
   }
-  $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits?sha=".$branch_sha.$since;
-  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Solicitando commits, rama ".$branch_sha."...<br/>";
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits?sha=".$branch_name.$since;
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Solicitando commits, rama ".$branch_name."...<br/>";
   echo $url."<br/>";
   $response = executeRequest($url);
   $json_commits = json_decode($response);
@@ -206,9 +205,9 @@ function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
     echo "Error: ".$json_commits->message;
     die();
   }
-  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Agregando commits, rama ".$branch_sha."...<br/>";
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Agregando commits, rama ".$branch_name."...<br/>";
   foreach ($json_commits as $commit) {
-    $rows_affected = insertCommit($commit, $branch_sha);
+    $rows_affected = insertCommit($commit, $branch_name);
     switch ($rows_affected) {
       case 0:
       echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Commit sin cambios: ".$commit->sha."<br/>";
@@ -223,8 +222,65 @@ function requestCommits($login, $repo_name, $branch_sha, $last_update = null) {
       echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, commit".$commit->sha."<br/>";
       break;
     }
+    requestSingleCommit($login, $repo_name, $commit->sha);
   }
   return $json_commits;
+}
+
+/**
+* Solicita a la API la información de un commit en formato JSON y la almacena en la base de datos
+* @param login el login del usuario propietario del repositorio
+* @param repo_name el nombre del repositorio al que pertenece el commit
+* @param commit_sha el identificador SHA del commit
+* @return json_commit La información del commit, en formato JSON
+*/
+function requestSingleCommit($login, $repo_name, $sha_commit) {
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/commits/".$sha_commit;
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Solicitando detalle del commit, SHA ".$sha_commit."...<br/>";
+  echo $url."<br/>";
+  $response = executeRequest($url);
+  $json_commit = json_decode($response);
+  if ($json_commit->message) {
+    echo "Error: ".$json_commit->message;
+    die();
+  }
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Agregando parents del commMMMMMMMit ".$sha_commit."...<br/>";
+  foreach ($json_commit->parents as $parent) {
+    $rows_affected = insertParent($parent, $sha_commit);
+    switch ($rows_affected) {
+      case 0:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Parent sin cambios: ".$parent->sha."<br/>";
+      break;
+      case 1:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nuevo parent: ".$parent->sha."<br/>";
+      break;
+      case 2:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Parent actualizado: ".$parent->sha."<br/>";
+      break;
+      default:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, parent".$parent->sha."<br/>";
+      break;
+    }
+  }
+  echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Agregando archivos del commit ".$sha_commit."...<br/>";
+  foreach ($json_commit->files as $file) {
+    $rows_affected = insertFile($file, $sha_commit);
+    switch ($rows_affected) {
+      case 0:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Archivo sin cambios: ".$file->filename."<br/>";
+      break;
+      case 1:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nuevo archivo: ".$file->filename."<br/>";
+      break;
+      case 2:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Archivo actualizado: ".$file->filename."<br/>";
+      break;
+      default:
+      echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Error en el query, archivo".$file->filename."<br/>";
+      break;
+    }
+  }
+  return $json_commit;
 }
 
 ?>
