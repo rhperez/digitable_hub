@@ -21,6 +21,78 @@ function executeRequest($url) {
 }
 
 /**
+* Ejecuta un POST request a la API
+* @param url la URL del request
+* @param headers el arreglo de headers del request
+* @param post_fields los parametros a enviar via POST
+* @return response la respuesta de la API, en una cadena en formato JSON.
+* En caso de no recibir respuesta, se genera una cadena en formato JSON con un mensaje de error.
+*/
+function executePostRequest($url, $headers, $post_fields) {
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_USERPWD, getOAuth_username().":".getOAuth_access_token());
+  //curl_setopt($ch, CURLOPT_HEADER, $headers);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  curl_setopt($ch, CURLOPT_POST, 1);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; .NET CLR 1.1.4322)');
+  $response = curl_exec($ch);
+  if (!$response) {
+    return '{"message":"No hubo respuesta del servidor"}';
+  }
+  return $response;
+}
+
+/**
+* Crea un nuevo proyecto y lo almacena en la base de datos
+* @param project_name el nombre del proyecto
+* @param project_body la decripcion del proyecto
+* @param columns_array el arreglo de columnas
+* @return json_project el proyecto creado en formato JSON
+*/
+function createProject($project_name, $project_body, $columns_array) {
+  $url = "https://api.github.com/user/projects";
+  $data = array(
+    "name" => $project_name,
+    "body" => $project_body
+  );
+  $data_string = json_encode($data);
+  $headers = [
+    'accept: application/vnd.github.inertia-preview+json',
+    'Content-Type: application/json',
+    'Content-Length: '.strlen($data_string)
+  ];
+  $json_project = json_decode(executePostRequest($url, $headers, $data_string));
+  foreach ($columns_array as $column) {
+    echo json_encode(createColumn($json_project->id, $column))."<br><br>";
+  }
+  return $json_project;
+}
+
+/**
+* Crea una nueva columna en un proyecto y la almacena en la base de datos
+* @param project_id el id del proyecto
+* @param column_name el nombre de la columna
+* @return json_column la columna creada en formato JSON
+*/
+function createColumn($project_id, $column_name) {
+  $url = "https://api.github.com/projects/".$project_id."/columns";
+  $data = array(
+    "name" => $column_name
+  );
+  $data_string = json_encode($data);
+  $headers = [
+    'accept: application/vnd.github.inertia-preview+json',
+    'Content-Type: application/json',
+    'Content-Length: '.strlen($data_string)
+  ];
+  $json_column = json_decode(executePostRequest($url, $headers, $data_string), JSON_PRETTY_PRINT);
+  return $json_column;
+}
+
+/**
 * Solicita a la API la información de la cuota límite de solicitudes disponibles para el usuario
 * @return json_rate_limit la información de la cuota límite, en formato JSON
 */
