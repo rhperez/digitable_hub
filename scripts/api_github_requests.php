@@ -23,19 +23,25 @@ function executeRequest($url) {
 /**
 * Ejecuta un POST request a la API
 * @param url la URL del request
-* @param headers el arreglo de headers del request
-* @param post_fields los parametros a enviar via POST
+* @param headers Opcional, el arreglo de headers del request
+* @param post_fields Opcional, los parametros a enviar via POST
 * @return response la respuesta de la API, en una cadena en formato JSON.
 * En caso de no recibir respuesta, se genera una cadena en formato JSON con un mensaje de error.
 */
-function executePostRequest($url, $headers, $post_fields) {
+function executePostRequest($url, $headers = null, $post_fields = null) {
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
   curl_setopt($ch, CURLOPT_USERPWD, getOAuth_username().":".getOAuth_access_token());
   //curl_setopt($ch, CURLOPT_HEADER, $headers);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-  curl_setopt($ch, CURLOPT_POST, 1);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+  if ($headers) {
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  }
+  if ($post_fields) {
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+  } else {
+    curl_setopt($ch, CURLOPT_POST, 0);
+  }
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; .NET CLR 1.1.4322)');
   $response = curl_exec($ch);
@@ -45,6 +51,32 @@ function executePostRequest($url, $headers, $post_fields) {
   return $response;
 }
 
+function requestOrganizations() {
+  $url = "https://api.github.com/user/orgs";
+  $json_organizations = json_decode(executeRequest($url));
+  return $json_organizations;
+}
+
+function requestOrganization($org_login) {
+  $url = "https://api.github.com/orgs/".$org_login;
+  $json_organization = json_decode(executeRequest($url));
+  return $json_organization;
+}
+
+/**
+* Obtiene la lista de proyectos de un usuario y los almacena en la base de datos
+* @param login el login del usuario
+* @return json_projects el listado de proyectos en formato JSON
+*/
+function requestProjects($login, $state) {
+  $url = "https://api.github.com/users/".$login."/projects?state=".$state;
+  $headers = [
+    'accept: application/vnd.github.inertia-preview+json'
+  ];
+  $json_projects = json_decode(executePostRequest($url, $headers));
+  return $json_projects;
+}
+
 /**
 * Crea un nuevo proyecto y lo almacena en la base de datos
 * @param project_name el nombre del proyecto
@@ -52,8 +84,36 @@ function executePostRequest($url, $headers, $post_fields) {
 * @param columns_array el arreglo de columnas
 * @return json_project el proyecto creado en formato JSON
 */
-function createProject($project_name, $project_body, $columns_array) {
+function createUserProject($project_name, $project_body, $columns_array) {
   $url = "https://api.github.com/user/projects";
+  $data = array(
+    "name" => $project_name,
+    "body" => $project_body
+  );
+  $data_string = json_encode($data);
+  $headers = [
+    'accept: application/vnd.github.inertia-preview+json',
+    'Content-Type: application/json',
+    'Content-Length: '.strlen($data_string)
+  ];
+  $json_project = json_decode(executePostRequest($url, $headers, $data_string));
+  foreach ($columns_array as $column) {
+    echo json_encode(createColumn($json_project->id, $column))."<br><br>";
+  }
+  return $json_project;
+}
+
+/**
+* Crea un nuevo proyecto a partir de un repositorio y lo almacena en la base de datos
+* @param login el login del propietario del repo
+* @param repo_name el nombre del repositorio
+* @param project_name el nombre del proyecto
+* @param project_body la decripcion del proyecto
+* @param columns_array el arreglo de columnas
+* @return json_project el proyecto creado en formato JSON
+*/
+function createRepoProject($login, $repo_name, $project_name, $project_body, $columns_array) {
+  $url = "https://api.github.com/repos/".$login."/".$repo_name."/projects";
   $data = array(
     "name" => $project_name,
     "body" => $project_body
