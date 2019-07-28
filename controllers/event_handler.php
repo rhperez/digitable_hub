@@ -5,15 +5,7 @@
 * @param json_payload el payload recibido del webhook
 * @return true si y sólo si el evento se manejó exitosamente
 */
-function projectEventHandler($json_payload) {
-  if ($json_payload->organization) {
-    // TODO upsertOrganization
-    $organization_id = $json_payload->organization->id;
-  }
-  if ($json_payload->sender) {
-    // TODO upsertSender
-    $created_by = $json_payload->sender->login;
-  }
+function projectEventHandler ($json_payload) {
   $action = $json_payload->action;
   $action_details = null;
   switch ($action) {
@@ -34,6 +26,14 @@ function projectEventHandler($json_payload) {
     }
     break;
   }
+  if ($json_payload->organization) {
+    // TODO upsertOrganization
+    $organization_id = $json_payload->organization->id;
+  }
+  if ($json_payload->sender) {
+    // TODO upsertSender
+    $created_by = $json_payload->sender->login;
+  }
   if (upsertProject($json_payload->project) < 0) {
     return false;
   }
@@ -50,15 +50,7 @@ function projectEventHandler($json_payload) {
 * @param json_payload el payload recibido del webhook
 * @return true si y sólo si el evento se manejó exitosamente
 */
-function projectColumnEventHandler($json_payload) {
-  if ($json_payload->organization) {
-    // TODO upsertOrganization
-    $organization_id = $json_payload->organization->id;
-  }
-  if ($json_payload->sender) {
-    // TODO upsertSender
-    $created_by = $json_payload->sender->login;
-  }
+function projectColumnEventHandler ($json_payload) {
   $action = $json_payload->action;
   $action_details = null;
   switch ($action) {
@@ -82,7 +74,14 @@ function projectColumnEventHandler($json_payload) {
     }
     break;
   }
-  $affected_rows = upsertProjectColumn($json_payload->project_column);
+  if ($json_payload->organization) {
+    // TODO upsertOrganization
+    $organization_id = $json_payload->organization->id;
+  }
+  if ($json_payload->sender) {
+    // TODO upsertSender
+    $created_by = $json_payload->sender->login;
+  }
   if (upsertProjectColumn($json_payload->project_column) < 0) {
     return false;
   }
@@ -95,15 +94,7 @@ function projectColumnEventHandler($json_payload) {
 * @param json_payload el payload recibido del webhook
 * @return true si y sólo si el evento se manejó exitosamente
 */
-function projectCardEventHandler($json_payload) {
-  if ($json_payload->organization) {
-    // TODO upsertOrganization
-    $organization_id = $json_payload->organization->id;
-  }
-  if ($json_payload->sender) {
-    // TODO upsertSender
-    $created_by = $json_payload->sender->login;
-  }
+function projectCardEventHandler ($json_payload) {
   $action = $json_payload->action;
   $action_details = null;
   switch ($action) {
@@ -123,6 +114,14 @@ function projectCardEventHandler($json_payload) {
       $action = "updated";
     }
   }
+  if ($json_payload->organization) {
+    // TODO upsertOrganization
+    $organization_id = $json_payload->organization->id;
+  }
+  if ($json_payload->sender) {
+    // TODO upsertSender
+    $created_by = $json_payload->sender->login;
+  }
   if (upsertProjectCard($json_payload->project_card) < 0) {
     return false;
   }
@@ -135,15 +134,15 @@ function projectCardEventHandler($json_payload) {
 * @param json_payload el payload recibido del webhook
 * @return true si y sólo si el evento se manejó exitosamente
 */
-function issuesEventHandler($json_payload) {
+function issuesEventHandler ($json_payload) {
   $action = $json_payload->action;
-  switch ($json_payload->action) {
+  $action_details = null;
+  switch ($action) {
     case "opened":
     case "closed":
     case "reopened":
     case "deleted":
-      upsertIssue($action, null, $json_payload->issue, $json_payload->organization, $json_payload->sender);
-      break;
+    break;
     case "edited":
     case "transferred":
     case "pinned":
@@ -164,12 +163,38 @@ function issuesEventHandler($json_payload) {
         }
       } else {
         $action = "updated";
-        $action_details = null;
+
       }
-      upsertIssue($action, $action_details, $json_payload->issue, $json_payload->organization, $json_payload->sender);
+
+  }
+  if ($json_payload->organization) {
+    // TODO upsertOrganization
+    $organization_id = $json_payload->organization->id;
+  }
+  if ($json_payload->sender) {
+    // TODO upsertSender
+    $created_by = $json_payload->sender->login;
   }
   if ($json_payload->repository) {
-    upsertRepository("Issue: ".$action, null, $json_payload->repository);
+    upsertRepository($json_payload->repository);
+    $repository_id = $json_payload->repository->id;
+    insertActionLog('issue', $json_payload->issue->id, "linked", "repo_id: ".$repository_id);
   }
+  if ($json_payload->issue->milestone) {
+    upsertMilestone($json_payload->issue->milestone, $repository_id);
+    $milestone_id = $json_payload->issue->milestone->id;
+    insertActionLog('issue', $json_payload->issue->id, "linked", "milestone_id: ".$milestone_id);
+  }
+  unlabelIssue($json_payload->issue->id);
+  foreach ($json_payload->issue->labels as $json_label) {
+    upsertLabel($json_label, $repository_id);
+    upsertIssueLabel($json_payload->issue->id, $json_label->id);
+    insertActionLog('issue', $json_payload->issue->id, "linked", "label_id: ".$json_label->id);
+  }
+  if (upsertIssue($json_payload->issue, $repository_id, $milestone_id) < 0) {
+    return false;
+  }
+  insertActionLog('issue', $json_payload->issue->id, $action, $action_details, $created_by);
+  return true;
 }
  ?>
