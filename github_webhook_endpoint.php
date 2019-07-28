@@ -43,6 +43,7 @@ function json_decode_nice($json){
 /**
 * Maneja los eventos recibidos del webhook relacionados con los proyectos
 * @param json_payload el payload recibido del webhook
+* @return true si y sólo si el evento se manejó exitosamente
 */
 function projectEventHandler($json_payload) {
   if ($json_payload->organization) {
@@ -73,15 +74,21 @@ function projectEventHandler($json_payload) {
     }
     break;
   }
-  $affected_rows = upsertProject($json_payload->project, $organization_id);
-  if ($affected_rows > 0) {
-    insertActionLog('project', $json_payload->project->id, $action, $action_details, $created_by);
+  if (upsertProject($json_payload->project) < 0) {
+    return false;
   }
+  insertActionLog('project', $json_payload->project->id, $action, $action_details, $created_by);
+  if ($organization_id && upsertOrganizationProject($organization_id, $json_payload->project->id) < 0) {
+    return false;
+  }
+  insertActionLog('project', $json_payload->project->id, "linked", "organization_id: ".$organization_id, $created_by);
+  return true;
 }
 
 /**
 * Maneja los eventos recibidos del webhook relacionados a las columnas de proyectos
 * @param json_payload el payload recibido del webhook
+* @return true si y sólo si el evento se manejó exitosamente
 */
 function projectColumnEventHandler($json_payload) {
   if ($json_payload->organization) {
@@ -116,14 +123,17 @@ function projectColumnEventHandler($json_payload) {
     break;
   }
   $affected_rows = upsertProjectColumn($json_payload->project_column);
-  if ($affected_rows > 0) {
-    insertActionLog('project_column', $json_payload->project_column->id, $action, $action_details, $created_by);
+  if (upsertProjectColumn($json_payload->project_column) < 0) {
+    return false;
   }
+  insertActionLog('project_column', $json_payload->project_column->id, $action, $action_details, $created_by);
+  return true;
 }
 
 /**
 * Maneja los eventos recibidos del webhook relacionados a las tarjetas de proyectos
 * @param json_payload el payload recibido del webhook
+* @return true si y sólo si el evento se manejó exitosamente
 */
 function projectCardEventHandler($json_payload) {
   if ($json_payload->organization) {
@@ -153,15 +163,17 @@ function projectCardEventHandler($json_payload) {
       $action = "updated";
     }
   }
-  $affected_rows = upsertProjectCard($json_payload->project_card);
-  if ($affected_rows > 0) {
-    insertActionLog('project_column', $json_payload->project_card->id, $action, $action_details, $created_by);
+  if (upsertProjectCard($json_payload->project_card) < 0) {
+    return false;
   }
+  insertActionLog('project_card', $json_payload->project_card->id, $action, $action_details, $created_by);
+  return true;
 }
 
 /**
-* Maneja los eventos recibidos del webhook relacionados con issues
+* Maneja los eventos recibidos del webhook relacionados con issues de repositorios
 * @param json_payload el payload recibido del webhook
+* @return true si y sólo si el evento se manejó exitosamente
 */
 function issuesEventHandler($json_payload) {
   $action = $json_payload->action;
