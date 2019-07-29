@@ -16,7 +16,7 @@ function projectEventHandler ($json_payload) {
     break;
     case "edited":
     $changes = $json_payload->changes;
-    if (sizeof($changes) > 0) {
+    if ($changes) {
       $action_details = "Last values:";
       foreach ($changes as $key => $value) {
         $action_details .= "\n".$key.": ".$value->from;
@@ -34,7 +34,12 @@ function projectEventHandler ($json_payload) {
     // TODO upsertSender
     $created_by = $json_payload->sender->login;
   }
-  if (upsertProject($json_payload->project) < 0) {
+  if ($json_payload->repository) {
+    $repository_id = $json_payload->repository->id;
+    upsertRepository($json_payload->repository);
+    insertActionLog('project', $json_payload->project->id, "linked", "repo_id: ".$repository_id, $created_by);
+  }
+  if (upsertProject($json_payload->project, $repository_id) < 0) {
     return false;
   }
   insertActionLog('project', $json_payload->project->id, $action, $action_details, $created_by);
@@ -59,7 +64,7 @@ function projectColumnEventHandler ($json_payload) {
     break;
     case "edited":
     $changes = $json_payload->changes;
-    if (sizeof($changes) > 0) {
+    if ($changes) {
       $action_details = "Last values:";
       foreach ($changes as $key => $value) {
         $action_details .= "\n".$key.": ".$value->from;
@@ -105,7 +110,7 @@ function projectCardEventHandler ($json_payload) {
     case "moved":
     case "converted":
     $changes = $json_payload->changes;
-    if (sizeof($changes) > 0) {
+    if ($changes) {
       $action_details = "Last values:";
       foreach ($changes as $key => $value) {
         $action_details .= "\n".$key.": ".$value->from;
@@ -156,7 +161,7 @@ function issuesEventHandler ($json_payload) {
     case "milestoned":
     case "unmilestoned":
       $changes = $json_payload->changes;
-      if (sizeof($changes) > 0) {
+      if ($changes) {
         $action_details = "Last values:";
         foreach ($changes as $key => $value) {
           $action_details .= "\n".$key.": ".$value->from;
@@ -178,18 +183,18 @@ function issuesEventHandler ($json_payload) {
   if ($json_payload->repository) {
     upsertRepository($json_payload->repository);
     $repository_id = $json_payload->repository->id;
-    insertActionLog('issue', $json_payload->issue->id, "linked", "repo_id: ".$repository_id);
+    insertActionLog('issue', $json_payload->issue->id, "linked", "repo_id: ".$repository_id, $created_by);
   }
   if ($json_payload->issue->milestone) {
     upsertMilestone($json_payload->issue->milestone, $repository_id);
     $milestone_id = $json_payload->issue->milestone->id;
-    insertActionLog('issue', $json_payload->issue->id, "linked", "milestone_id: ".$milestone_id);
+    insertActionLog('issue', $json_payload->issue->id, "linked", "milestone_id: ".$milestone_id, $created_by);
   }
   unlabelIssue($json_payload->issue->id);
   foreach ($json_payload->issue->labels as $json_label) {
     upsertLabel($json_label, $repository_id);
     upsertIssueLabel($json_payload->issue->id, $json_label->id);
-    insertActionLog('issue', $json_payload->issue->id, "linked", "label_id: ".$json_label->id);
+    insertActionLog('issue', $json_payload->issue->id, "linked", "label_id: ".$json_label->id, $created_by);
   }
   if (upsertIssue($json_payload->issue, $repository_id, $milestone_id) < 0) {
     return false;
