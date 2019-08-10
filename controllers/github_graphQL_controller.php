@@ -75,6 +75,25 @@ function getViewerRateLimit() {
   return $json_query;
 }
 
+function getUser($login) {
+  $json_query = 'query {
+    user(login:\"'.$login.'\") {
+      login
+      id
+      name
+      bio
+      company
+      avatarUrl
+      email
+      location
+      createdAt
+      updatedAt
+      websiteUrl
+    }
+  }';
+  return $json_query;
+}
+
 function getOrganizationId($login) {
   $json_query = 'query {
     organization(login:\"'.$login.'\") {
@@ -464,8 +483,9 @@ function createIssue($repository_id, $title, $body=null, $milestone_id = null, $
 }
 
 function testQuery() {
+  $json_transaction = getUser('rhperez');
   //$json_transaction = listRepositoryIssues('digitablemx', 'base_repo', 20);
-  $json_transaction = listOrganizationRepositories('digitablemx');
+  //$json_transaction = listOrganizationRepositories('digitablemx');
   //$json_transaction = addComment('MDU6SXNzdWU0NzQ4OTIxNjM=', 'Hello world');
   //$json_transaction = listUserProjects('rhperez', 5, array('OPEN', 'CLOSED'));
   //$json_transaction = listOrganizationProjects('digitablemx', 5, array('OPEN', 'CLOSED'));
